@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS quotes ADD CONSTRAINT unique_author_quote UNIQUE (author, quote);

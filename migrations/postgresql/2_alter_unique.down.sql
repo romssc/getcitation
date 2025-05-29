@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS quotes DROP CONSTRAINT unique_author_quote CASCADE;

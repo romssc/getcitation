@@ -1,3 +1,4 @@
+// Пакет postgresql предоставляет функциональность для работы с БД.
 package postgresql
 
 import (

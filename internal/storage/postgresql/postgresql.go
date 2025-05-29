@@ -3,13 +3,22 @@ package postgresql
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 
 	"getcitation/internal/utils"
 	"getcitation/internal/utils/config"
+)
+
+var (
+	CodeDuplicateEntry pq.ErrorCode = "23505"
+)
+
+var (
+	ErrDuplicateEntry = fmt.Errorf("duplicate entry")
 )
 
 // Storage содержит подключение к БД и основные зависимости (логгер, конфиг).
@@ -19,24 +28,10 @@ type Storage struct {
 	Config config.Config
 }
 
-// Manipulator описывает методы для создания и удаления цитат.
-type Manipulator interface {
-	CreateQuote(quote Quote) (int, error)
-	DeleteQuoteByID(id int) error
-}
-
-// Getter описывает методы для получения цитат.
-type Getter interface {
-	GetRandomQuote() (Quote, error)
-	GetQuotes(authorFilter string) ([]Quote, error)
-}
-
 // DB содержит подключение к PostgreSQL и обработчики.
 type DB struct {
 	Implementation *sql.DB
-
-	Manipulator Manipulator
-	Getter      Getter
+	Handlers       Handlers
 }
 
 // New создаёт новое соединение с PostgreSQL.
@@ -55,18 +50,14 @@ func New(config config.Config, log *slog.Logger) (Storage, error) {
 		return Storage{}, fmt.Errorf("%s: %w", op, err)
 	}
 
-	handlers := Handlers{
-		DB:     db,
-		Log:    log,
-		Config: config,
-	}
-
 	return Storage{
 		DB: DB{
 			Implementation: db,
-
-			Manipulator: handlers,
-			Getter:      handlers,
+			Handlers: Handlers{
+				DB:     db,
+				Log:    log,
+				Config: config,
+			},
 		},
 		Log:    log,
 		Config: config,
@@ -109,9 +100,13 @@ func (h Handlers) CreateQuote(quote Quote) (int, error) {
 	defer tx.Rollback()
 
 	var id int
+	var e *pq.Error
 
 	err = tx.QueryRow(`INSERT INTO quotes (author, quote) VALUES ($1, $2) RETURNING id`, quote.Author, quote.Quote).Scan(&id)
 	if err != nil {
+		if errors.As(err, &e) && e.Code == CodeDuplicateEntry {
+			return 0, fmt.Errorf("%s: %w", op, ErrDuplicateEntry)
+		}
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -144,7 +139,7 @@ func (h Handlers) DeleteQuoteByID(id int) error {
 	}
 
 	if affected == 0 {
-		return fmt.Errorf("%s: quote with id %d not found", op, id)
+		return fmt.Errorf("%s: %w", op, sql.ErrNoRows)
 	}
 
 	err = tx.Commit()
@@ -198,6 +193,9 @@ func (h Handlers) GetQuotes(authorFilter string) ([]Quote, error) {
 		rows, err = tx.Query(`SELECT id, author, quote FROM quotes WHERE author = $1`, authorFilter)
 	}
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, sql.ErrNoRows)
+		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	defer rows.Close()

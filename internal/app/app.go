@@ -13,6 +13,7 @@ import (
 	"getcitation/internal/utils/config"
 )
 
+// App — основной объект приложения, агрегирующий все ключевые компоненты.
 type App struct {
 	GetCitation getcitation.App
 	Storage     storage.Storage
@@ -20,6 +21,7 @@ type App struct {
 	Config      config.Config
 }
 
+// New — конструктор для App. Создаёт и инициализирует все зависимости приложения.
 func New() (App, error) {
 	const op = "app.New()"
 
@@ -48,6 +50,7 @@ func New() (App, error) {
 	}, nil
 }
 
+// Run — запускает приложение, обрабатывает сигналы завершения и ошибки.
 func (a App) Run() {
 	const op = "app.Run()"
 
@@ -99,6 +102,7 @@ func (a App) Run() {
 	}
 }
 
+// shutdown — корректно завершает работу всех компонентов приложения.
 func (a App) shutdown() []error {
 	const op = "app.shutdown()"
 

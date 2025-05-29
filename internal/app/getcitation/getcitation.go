@@ -73,8 +73,8 @@ func New(db storage.Storage, config config.Config, log *slog.Logger) App {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/quotes", handlers.GetAndCreateQuotes)
+	mux.HandleFunc("/quotes/", handlers.DeleteQuoteByID)
 	mux.HandleFunc("/quotes/random", handlers.GetRandomQuote)
-	mux.HandleFunc("/quotes/delete/", handlers.DeleteQuoteByID)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", config.ServerHost, config.ServerPort),
@@ -143,7 +143,9 @@ type Status struct {
 }
 
 type CreateQuoteRequest struct {
-	storage.Quote
+	ID     int    `json:"id"`
+	Author string `json:"author"`
+	Quote  string `json:"quote"`
 }
 
 type CreateQuoteResponse struct {
@@ -186,7 +188,28 @@ func (h Handlers) GetAndCreateQuotes(w http.ResponseWriter, r *http.Request) {
 		}
 		defer r.Body.Close()
 
-		id, err := h.Manipulator.CreateQuote(req.Author, req.Quote.Quote)
+		if req.Author == "" || req.Quote == "" {
+			h.Log.Error(
+				errBadRequest,
+				slog.String("op", op),
+				slog.Any("error", err),
+				slog.String("path", r.URL.Path),
+			)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+
+			json.NewEncoder(w).Encode(Error{
+				Status: Status{
+					Code:    http.StatusBadRequest,
+					Message: errBadRequest,
+				},
+			})
+
+			return
+		}
+
+		id, err := h.Manipulator.CreateQuote(req.Author, req.Quote)
 		if err != nil {
 			if errors.Is(err, ErrDuplicateEntry) {
 				h.Log.Error(
@@ -342,8 +365,10 @@ func (h Handlers) DeleteQuoteByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) != 3 || parts[0] != "quotes" || parts[1] != "delete" {
+	parts := strings.Split(r.URL.Path, "/")
+
+	idStr := parts[2]
+	if idStr == "" {
 		h.Log.Error(
 			errBadRequest,
 			slog.String("op", op),
@@ -363,7 +388,6 @@ func (h Handlers) DeleteQuoteByID(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	idStr := parts[2]
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {

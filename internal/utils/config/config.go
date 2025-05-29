@@ -1,6 +1,8 @@
+// Пакет config предоставляет функциональность для загрузки конфигурации приложения из переменных окружения, включая параметры сервера и БД.
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config содержит параметры конфигурации приложения, загружаемые из env-переменных.
 type Config struct {
 	AppLogMode string `env:"APP_LOG_MODE" env-required:"true" env-description:"Режим логгирования (local, dev, prod)"`
 
@@ -32,6 +35,13 @@ type Config struct {
 	PostgreSQLExtra    string `env:"POSTGRESQL_EXTRA" env-description:"Дополнительные опции PostgreSQL"`
 }
 
+// Кастомные ошибки, возвращаемые при ошибках конфигурации.
+var (
+	ErrEnvLoad  = errors.New("не удалось загрузить .env файл")
+	ErrEnvParse = errors.New("ошибка разбора переменных окружения")
+)
+
+// New загружает конфигурацию из переменных окружения, используя .env файл и cleanenv.
 func New() (Config, error) {
 	const op = "config.New()"
 
@@ -39,19 +49,19 @@ func New() (Config, error) {
 
 	err := godotenv.Load()
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("%s: %w: %v", op, ErrEnvLoad, err)
 	}
 
 	err = cleanenv.ReadEnv(&config)
 	if err != nil {
 		fmt.Println("")
 
-		header := "ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ:"
+		header := "Ожидаемые переменные окружения:"
 		cleanenv.FUsage(os.Stdout, &config, &header)()
 
 		fmt.Println("")
 
-		return Config{}, err
+		return Config{}, fmt.Errorf("%s: %w: %v", op, ErrEnvParse, err)
 	}
 
 	return config, nil

@@ -77,8 +77,11 @@ func New(db storage.Storage, config config.Config, log *slog.Logger) App {
 	mux.HandleFunc("/quotes/delete/", handlers.DeleteQuoteByID)
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", config.ServerHost, config.ServerPort),
-		Handler: mux,
+		Addr:         fmt.Sprintf("%s:%s", config.ServerHost, config.ServerPort),
+		Handler:      mux,
+		WriteTimeout: config.ServerWriteTimeout,
+		ReadTimeout:  config.ServerReadTimeout,
+		IdleTimeout:  config.ServerIdleTimeout,
 	}
 
 	return App{

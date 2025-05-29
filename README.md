@@ -85,8 +85,8 @@ go run cmd/migrator/main.go
 **5. Соберите и запустите приложение:**
 
 ```bash
-go build -o getcitation
-./getcitation
+go build -o build/getcitation cmd/getcitation/main.go
+./build/getcitation
  ```
 
 **6. По умолчанию сервис запущен на `http://localhost:8080`.**

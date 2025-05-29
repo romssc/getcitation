@@ -1,0 +1,7 @@
+# TRASH ######
+
+*.DS_Store
+
+# LOCATIONS ##
+
+/log

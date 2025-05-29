@@ -2,7 +2,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -35,12 +34,6 @@ type Config struct {
 	PostgreSQLExtra    string `env:"POSTGRESQL_EXTRA" env-description:"Дополнительные опции PostgreSQL"`
 }
 
-// Кастомные ошибки, возвращаемые при ошибках конфигурации.
-var (
-	ErrEnvLoad  = errors.New("не удалось загрузить .env файл")
-	ErrEnvParse = errors.New("ошибка разбора переменных окружения")
-)
-
 // New загружает конфигурацию из переменных окружения, используя .env файл и cleanenv.
 func New() (Config, error) {
 	const op = "config.New()"
@@ -49,7 +42,7 @@ func New() (Config, error) {
 
 	err := godotenv.Load()
 	if err != nil {
-		return Config{}, fmt.Errorf("%s: %w: %v", op, ErrEnvLoad, err)
+		return Config{}, fmt.Errorf("%s: %w", op, err)
 	}
 
 	err = cleanenv.ReadEnv(&config)
@@ -61,7 +54,7 @@ func New() (Config, error) {
 
 		fmt.Println("")
 
-		return Config{}, fmt.Errorf("%s: %w: %v", op, ErrEnvParse, err)
+		return Config{}, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return config, nil

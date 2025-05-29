@@ -15,6 +15,7 @@ import (
 	"getcitation/internal/utils/config"
 )
 
+// Сообщения об ошибках для ответов HTTP
 const (
 	errMethodNotAllowed    string = "Method Not Allowed"
 	errBadRequest          string = "Invalid Request Body"
@@ -23,6 +24,7 @@ const (
 	errConflict            string = "Conflict"
 )
 
+// Сообщения для конкретных ошибок в ответах
 const (
 	messageNoID               string = "ID must be present as query parameter"
 	messageMalformedID        string = "ID parameter is malformed"
@@ -31,26 +33,31 @@ const (
 	messageQuotesNotFound     string = "No quotes found"
 )
 
+// Сообщения успешных операций
 const (
 	successDelete string = "Quote deleted successfully"
 )
 
+// Ошибки для внутреннего использования
 var (
 	ErrDuplicateEntry = fmt.Errorf("similar entry already exists")
 	ErrNoQuotesFound  = fmt.Errorf("no quotes found")
 )
 
+// App представляет основное приложение с HTTP-сервером, логгером и конфигом
 type App struct {
 	Server Server
 	Log    *slog.Logger
 	Config config.Config
 }
 
+// Server содержит HTTP сервер и обработчики маршрутов
 type Server struct {
 	HTTPServer *http.Server
 	Handlers   Handlers
 }
 
+// New создает и инициализирует новое приложение getcitation
 func New(db storage.Storage, config config.Config, log *slog.Logger) App {
 	const op = "getcitation.New()"
 
@@ -94,6 +101,7 @@ func New(db storage.Storage, config config.Config, log *slog.Logger) App {
 	}
 }
 
+// Run запускает HTTP сервер приложения и блокирует выполнение до его остановки
 func (a App) Run() error {
 	const op = "getcitation.Run()"
 
@@ -104,6 +112,7 @@ func (a App) Run() error {
 	return nil
 }
 
+// Shutdown корректно завершает работу HTTP сервера
 func (a App) Shutdown() error {
 	const op = "getcitation.Shutdown()"
 
@@ -114,16 +123,19 @@ func (a App) Shutdown() error {
 	return nil
 }
 
+// Интерфейс для манипуляций с цитатами (создание, удаление)
 type ServiceManipulator interface {
 	CreateQuote(author string, quote string) (int, error)
 	DeleteQuoteByID(id int) error
 }
 
+// Интерфейс для получения цитат (рандомная, по автору)
 type ServiceGetter interface {
 	GetRandomQuote() (storage.Quote, error)
 	GetQuotes(authorFilter string) ([]storage.Quote, error)
 }
 
+// Handlers содержит методы HTTP-обработчиков, использующих сервис
 type Handlers struct {
 	Log    *slog.Logger
 	Config config.Config
@@ -132,32 +144,38 @@ type Handlers struct {
 	Getter      ServiceGetter
 }
 
+// Error описывает структуру ошибки в формате JSON для ответов API
 type Error struct {
 	Status  Status `json:"status"`
 	Message string `json:"message"`
 }
 
+// Status описывает статус HTTP ответа
 type Status struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+// CreateQuoteRequest описывает формат запроса на создание цитаты
 type CreateQuoteRequest struct {
 	ID     int    `json:"id"`
 	Author string `json:"author"`
 	Quote  string `json:"quote"`
 }
 
+// CreateQuoteResponse описывает формат успешного ответа при создании цитаты
 type CreateQuoteResponse struct {
 	Status Status `json:"status"`
 	ID     int    `json:"id"`
 }
 
+// GetQuotesResponse описывает формат ответа при запросе списка цитат
 type GetQuotesResponse struct {
 	Status Status          `json:"status"`
 	Quotes []storage.Quote `json:"quotes"`
 }
 
+// GetAndCreateQuotes обрабатывает HTTP запросы на получение списка цитат и создание новых
 func (h Handlers) GetAndCreateQuotes(w http.ResponseWriter, r *http.Request) {
 	const op = "getcitation.Transport.GetAndCreateQuotes()"
 
@@ -337,11 +355,13 @@ func (h Handlers) GetAndCreateQuotes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteQuoteByIDResponse описывает формат ответа при удалении цитаты
 type DeleteQuoteByIDResponse struct {
 	Status  Status `json:"status"`
 	Message string `json:"message"`
 }
 
+// DeleteQuoteByID обрабатывает HTTP DELETE запрос на удаление цитаты по ID
 func (h Handlers) DeleteQuoteByID(w http.ResponseWriter, r *http.Request) {
 	const op = "getcitation.Transport.DeleteQuoteByID()"
 
@@ -466,11 +486,13 @@ func (h Handlers) DeleteQuoteByID(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetRandomQuoteResponse описывает формат ответа при получении случайной цитаты
 type GetRandomQuoteResponse struct {
 	Status Status        `json:"status"`
 	Quote  storage.Quote `json:"quote"`
 }
 
+// GetRandomQuote обрабатывает HTTP GET запрос на получение случайной цитаты
 func (h Handlers) GetRandomQuote(w http.ResponseWriter, r *http.Request) {
 	const op = "getcitation.Transport.GetRandomQuote()"
 
@@ -527,16 +549,19 @@ func (h Handlers) GetRandomQuote(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DBManipulator описывает интерфейс для операций с БД, связанными с цитатами (создание, удаление)
 type DBManipulator interface {
 	CreateQuote(quote storage.Quote) (int, error)
 	DeleteQuoteByID(id int) error
 }
 
+// DBGetter описывает интерфейс для получения цитат из БД
 type DBGetter interface {
 	GetRandomQuote() (storage.Quote, error)
 	GetQuotes(authorFilter string) ([]storage.Quote, error)
 }
 
+// Service реализует бизнес-логику приложения — создание, удаление и получение цитат
 type Service struct {
 	Log    *slog.Logger
 	Config config.Config
@@ -545,6 +570,7 @@ type Service struct {
 	Getter      DBGetter
 }
 
+// CreateQuote создает новую цитату через слой хранилища и обрабатывает возможные ошибки дубликатов
 func (s Service) CreateQuote(author string, quote string) (int, error) {
 	const op = "getcitation.Service.CreateQuote()"
 
@@ -561,6 +587,7 @@ func (s Service) CreateQuote(author string, quote string) (int, error) {
 	return id, nil
 }
 
+// DeleteQuoteByID удаляет цитату по ID, возвращает ошибку, если цитата не найдена
 func (s Service) DeleteQuoteByID(id int) error {
 	const op = "getcitation.Service.DeleteQuoteByID()"
 
@@ -574,6 +601,7 @@ func (s Service) DeleteQuoteByID(id int) error {
 	return nil
 }
 
+// GetRandomQuote получает случайную цитату из хранилища
 func (s Service) GetRandomQuote() (storage.Quote, error) {
 	const op = "getcitation.Service.GetRandomQuote()"
 
@@ -584,6 +612,7 @@ func (s Service) GetRandomQuote() (storage.Quote, error) {
 	return quote, nil
 }
 
+// GetQuotes возвращает список цитат с возможным фильтром по автору
 func (s Service) GetQuotes(authorFilter string) ([]storage.Quote, error) {
 	const op = "getcitation.Service.GetQuotes()"
 
